@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanceTracker - Student Finance Management</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="data:application/json,{%22name%22:%22FinanceTracker%22,%22short_name%22:%22FinanceTracker%22,%22start_url%22:%22/%22,%22display%22:%22standalone%22,%22background_color%22:%22%23fcfcf9%22,%22theme_color%22:%22%23667eea%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%23667eea'/%3E%3Ctext x='50' y='60' text-anchor='middle' fill='white' font-size='40'%3E₹%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22}]}">
+    
+    <!-- iOS Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="FinanceTracker">
+    
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; connect-src 'self';">
+</head>
+<body>
+    <!-- Authentication Screen - SIMPLIFIED PIN ONLY -->
+    <div class="auth-screen hidden" id="authScreen">
+        <!-- PIN Setup (First time only) -->
+        <div class="pin-setup-container hidden" id="setupPrompt">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+        
+        <!-- PIN Login (After first time) -->
+        <div class="pin-login-container hidden" id="pinLogin">
+            <div class="pin-login-header">
+                <h1>FinanceTracker</h1>
+                <h3>Enter your 6 Digit PIN</h3>
+            </div>
+            
+            <div class="pin-display" id="pinDisplay">
+                <div class="pin-dots">
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                </div>
+            </div>
+            
+            <div class="pin-keypad" id="pinKeypad">
+                <!-- Keypad will be populated by JavaScript -->
+            </div>
+            
+            <div class="pin-error hidden" id="pinError">
+                Incorrect PIN. Please try again.
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div class="app-container hidden" id="appContainer">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="user-info">
+                    <h2 id="greeting">Hi Shatanshu!</h2>
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" id="notificationBtn">
+                        <span class="notification-badge hidden" id="notificationBadge">3</span>
+                        🔔
+                    </button>
+                    <button class="icon-btn" id="themeToggle">🌙</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard View -->
+            <div class="view active" id="dashboard">
+                <!-- Balance Cards -->
+                <section class="balance-section">
+                    <div class="balance-card primary">
+                        <h3>Total Balance</h3>
+                        <div class="balance-amount" id="totalBalance">₹0</div>
+                        <div class="balance-change positive" id="balanceChange">Start your journey!</div>
+                    </div>
+                    <div class="balance-grid">
+                        <div class="balance-card">
+                            <h4>Monthly Income</h4>
+                            <div class="amount" id="monthlyIncome">₹0</div>
+                        </div>
+                        <div class="balance-card">
+                            <h4>Monthly Expenses</h4>
+                            <div class="amount expense" id="monthlyExpenses">₹0</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Quick Actions -->
+                <section class="quick-actions">
+                    <button class="action-btn primary" id="addExpenseBtn">
+                        <span class="action-icon">➖</span>
+                        <span>Add Expense</span>
+                    </button>
+                    <button class="action-btn" id="addIncomeBtn">
+                        <span class="action-icon">➕</span>
+                        <span>Add Income</span>
+                    </button>
+                    <button class="action-btn" id="transferBtn">
+                        <span class="action-icon">↔️</span>
+                        <span>Transfer</span>
+                    </button>
+                </section>
+
+                <!-- Spending Overview Chart -->
+                <section class="card">
+                    <div class="card-header">
+                        <h3>Spending Overview</h3>
+                        <select id="chartPeriod" class="form-control small">
+                            <option value="week">This Week</option>
+                            <option value="month" selected>This Month</option>
+                            <option value="year">This Year</option>
+                        </select>
+                    </div>
+                    <div class="chart-container" style="position: relative; height: 300px;">
+                        <canvas id="spendingChart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Budget Progress -->
+                <section class="card">
+                    <div class="card-header">
+                        <h3>Budget Progress</h3>
+                        <a href="#" id="manageBudgetBtn" class="btn btn--sm">Manage</a>
+                    </div>
+                    <div class="budget-list" id="budgetProgress">
+                        <div class="empty-state">
+                            <p>Set your budgets to start tracking!</p>
+                            <button class="btn btn--primary btn--sm" id="setBudgetsBtn">Set Budgets</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Recent Transactions -->
+                <section class="card">
+                    <div class="card-header">
+                        <h3>Recent Transactions</h3>
+                        <a href="#" id="viewAllTransactions" class="btn btn--sm">View All</a>
+                    </div>
+                    <div class="transaction-list" id="recentTransactions">
+                        <div class="empty-state">
+                            <p>No transactions yet. Start by adding your first transaction!</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Transactions View -->
+            <div class="view" id="transactions">
+                <div class="view-header">
+                    <h2>Transactions</h2>
+                    <div class="header-actions">
+                        <select class="form-control small" id="monthFilter">
+                            <option value="">All Months</option>
+                        </select>
+                        <button class="btn btn--primary btn--sm" id="addTransactionBtn">+ Add</button>
+                    </div>
+                </div>
+                
+                <div class="transaction-filters">
+                    <select class="form-control" id="categoryFilter">
+                        <option value="">All Categories</option>
+                    </select>
+                    <select class="form-control" id="typeFilter">
+                        <option value="">All Types</option>
+                        <option value="income">Income</option>
+                        <option value="expense">Expense</option>
+                    </select>
+                </div>
+
+                <div class="category-total hidden" id="categoryTotal">
+                    <div class="total-display">
+                        <span id="totalLabel">Total Spending:</span> 
+                        <span id="totalAmount">₹0</span>
+                    </div>
+                </div>
+
+                <div class="transaction-list full" id="allTransactions">
+                    <div class="empty-state">
+                        <p>No transactions to show. Add your first transaction to get started!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Budget View -->
+            <div class="view" id="budget">
+                <div class="view-header">
+                    <h2>Budget Management</h2>
+                    <button class="btn btn--primary btn--sm" id="addBudgetBtn">Set Budgets</button>
+                </div>
+
+                <div class="budget-overview">
+                    <div class="budget-summary-card">
+                        <h3>Monthly Budget</h3>
+                        <div class="budget-total" id="budgetSummary">₹0 / ₹0</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="budgetProgressFill" style="width: 0%"></div>
+                        </div>
+                        <p id="budgetUsageText">Set your budgets to start tracking</p>
+                    </div>
+                </div>
+
+                <div class="budget-categories" id="budgetCategories">
+                    <!-- Budget categories will be populated here -->
+                </div>
+            </div>
+
+            <!-- Analytics View -->
+            <div class="view" id="analytics">
+                <div class="view-header">
+                    <h2>Analytics</h2>
+                    <select class="form-control small" id="analyticsType">
+                        <option value="spending">Spending Analysis</option>
+                        <option value="income">Income Analysis</option>
+                        <option value="trends">Trends</option>
+                    </select>
+                </div>
+
+                <div class="analytics-cards">
+                    <div class="stat-card">
+                        <h4>Average Daily Spending</h4>
+                        <div class="stat-value" id="avgDailySpending">₹0</div>
+                        <div class="stat-change" id="spendingChange">No data yet</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Savings Rate</h4>
+                        <div class="stat-value" id="savingsRate">0%</div>
+                        <div class="stat-change" id="savingsChange">Start saving today!</div>
+                    </div>
+                </div>
+
+                <div class="chart-container" style="position: relative; height: 400px;">
+                    <canvas id="analyticsChart"></canvas>
+                </div>
+
+                <div class="insights-section">
+                    <h3>Insights & Recommendations</h3>
+                    <div id="insightsList">
+                        <div class="empty-state">
+                            <p>Add some transactions to get personalized insights!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Goals View -->
+            <div class="view" id="goals">
+                <div class="view-header">
+                    <h2>Savings Goals</h2>
+                    <button class="btn btn--primary btn--sm" id="addGoalBtn">+ Goal</button>
+                </div>
+
+                <div class="goals-grid" id="goalsGrid">
+                    <div class="empty-state">
+                        <p>No savings goals yet. Create your first goal to start saving!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bills View - NEW FEATURE -->
+            <div class="view" id="bills">
+                <div class="view-header">
+                    <h2>📄 Bills & Receipts</h2>
+                    <button class="btn btn--primary btn--sm" id="scanBillBtn">📷 Scan Bill</button>
+                </div>
+                
+                <div class="bills-stats">
+                    <div class="stat-card">
+                        <h4>Total Bills</h4>
+                        <div class="stat-value" id="totalBills">0</div>
+                        <div class="stat-change">Scanned documents</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>This Month</h4>
+                        <div class="stat-value" id="monthlyBills">0</div>
+                        <div class="stat-change">New bills</div>
+                    </div>
+                </div>
+
+                <div class="bills-list" id="billsList">
+                    <!-- Bills will be populated here -->
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation - UPDATED WITH BILLS -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-view="dashboard">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Home</span>
+            </button>
+            <button class="nav-item" data-view="transactions">
+                <span class="nav-icon">📝</span>
+                <span class="nav-label">Transactions</span>
+            </button>
+            <button class="nav-item" data-view="bills">
+                <span class="nav-icon">📄</span>
+                <span class="nav-label">Bills</span>
+            </button>
+            <button class="nav-item" data-view="analytics">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Analytics</span>
+            </button>
+            <button class="nav-item" data-view="budget">
+                <span class="nav-icon">💰</span>
+                <span class="nav-label">Budget</span>
+            </button>
+            <button class="nav-item" data-view="goals">
+                <span class="nav-icon">🎯</span>
+                <span class="nav-label">Goals</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Modals -->
+    <!-- Add Transaction Modal -->
+    <div class="modal hidden" id="transactionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add Transaction</h3>
+                <button class="modal-close" id="closeModal">✕</button>
+            </div>
+            <form id="transactionForm">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select class="form-control" id="transactionType" required>
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Amount (₹) *</label>
+                    <input type="number" class="form-control" id="transactionAmount" required min="0" step="0.01" placeholder="Enter amount">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select class="form-control" id="transactionCategory">
+                        <!-- Categories will be populated by JavaScript -->
+                    </select>
+                </div>
+                <div class="form-group" id="expenseNameGroup">
+                    <label class="form-label">Place/Name (Optional)</label>
+                    <input type="text" class="form-control" id="expenseName" placeholder="e.g., Amaya Cafe, ATM">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description (Optional)</label>
+                    <input type="text" class="form-control" id="transactionDescription" placeholder="e.g., Paneer Curry, Bus fare">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Account</label>
+                    <select class="form-control" id="transactionAccount">
+                        <!-- Accounts will be populated by JavaScript -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" class="form-control" id="transactionDate">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--secondary" id="cancelTransaction">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Goal Modal -->
+    <div class="modal hidden" id="goalModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="goalModalTitle">Add Savings Goal</h3>
+                <button class="modal-close" id="closeGoalModal">✕</button>
+            </div>
+            <form id="goalForm">
+                <div class="form-group">
+                    <label class="form-label">Goal Name</label>
+                    <input type="text" class="form-control" id="goalName" required placeholder="e.g., New Laptop">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Target Amount (₹)</label>
+                    <input type="number" class="form-control" id="goalTarget" required min="0" placeholder="e.g., 50000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Current Amount (₹)</label>
+                    <input type="number" class="form-control" id="goalCurrent" min="0" value="0" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Target Date</label>
+                    <input type="date" class="form-control" id="goalDate" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <select class="form-control" id="goalPriority">
+                        <option value="high">High</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--secondary" id="cancelGoal">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Create Goal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Budget Edit Modal -->
+    <div class="modal hidden" id="budgetModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Set Budget</h3>
+                <button class="modal-close" id="closeBudgetModal">✕</button>
+            </div>
+            <form id="budgetForm">
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <input type="text" class="form-control" id="budgetCategory" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Monthly Budget (₹)</label>
+                    <input type="number" class="form-control" id="budgetAmount" required min="0" placeholder="e.g., 5000">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--secondary" id="cancelBudget">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save Budget</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Split Expense Modal -->
+    <div class="modal hidden" id="splitModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Split Expense</h3>
+                <button class="modal-close" id="closeSplitModal">✕</button>
+            </div>
+            <div class="split-calculator">
+                <div class="form-group">
+                    <label class="form-label">Total Amount (₹)</label>
+                    <input type="number" class="form-control" id="splitAmount" min="0" step="0.01" placeholder="e.g., 500">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Number of People</label>
+                    <input type="number" class="form-control" id="splitPeople" min="2" value="2">
+                </div>
+                <div class="split-result">
+                    <h4>Amount per person: ₹<span id="splitResult">0</span></h4>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--secondary" id="cancelSplit">Close</button>
+                    <button type="button" class="btn btn--primary" id="addSplitExpense">Add as Expense</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal hidden" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Confirm Delete</h3>
+                <button class="modal-close" id="closeDeleteModal">✕</button>
+            </div>
+            <div style="padding: var(--space-20);">
+                <p id="deleteMessage">Are you sure you want to delete this item?</p>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--secondary" id="cancelDelete">Cancel</button>
+                    <button type="button" class="btn btn--primary" id="confirmDelete" style="background: var(--color-error);">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bill Scanning Modal - NEW -->
+    <div class="modal hidden" id="billScanModal">
+        <div class="modal-content bill-scan-content">
+            <div class="modal-header">
+                <h3>📄 Scan Your Bill</h3>
+                <button class="modal-close" id="closeBillScan">✕</button>
+            </div>
+            <div class="scan-area">
+                <video id="billVideo" autoplay playsinline style="width: 100%; height: 300px; object-fit: cover; border-radius: var(--radius-base);"></video>
+                <canvas id="billCanvas" style="display: none;"></canvas>
+                <div class="scan-overlay">
+                    <div class="scan-frame"></div>
+                    <p class="scan-instruction">Position bill within the frame</p>
+                </div>
+            </div>
+            <div class="scan-controls">
+                <button class="btn btn--primary btn--full-width" id="captureBillBtn">
+                    📷 Capture Bill
+                </button>
+                <button class="btn btn--secondary btn--full-width" id="cancelScanBtn">Cancel</button>
+            </div>
+            <div class="captured-preview hidden" id="billPreview">
+                <img id="capturedBillImage" alt="Captured bill" style="width: 100%; max-height: 300px; object-fit: contain; border-radius: var(--radius-base);">
+                <div class="preview-actions">
+                    <button class="btn btn--primary" id="saveBillBtn">💾 Save Bill</button>
+                    <button class="btn btn--secondary" id="retakeBillBtn">🔄 Retake</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bill Fullscreen Modal - NEW -->
+    <div class="modal hidden" id="billFullscreenModal">
+        <div class="modal-content fullscreen-content">
+            <div class="modal-header">
+                <h3>📄 Bill Document</h3>
+                <button class="modal-close" id="closeBillFullscreen">✕</button>
+            </div>
+            <div class="fullscreen-image">
+                <img id="fullscreenBillImage" alt="Bill" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+            </div>
+            <div class="fullscreen-actions">
+                <button class="btn btn--primary" id="addBillAsTransaction">➕ Add as Transaction</button>
+                <button class="btn btn--secondary" id="deleteBillBtn">🗑️ Delete Bill</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Panel -->
+    <div class="notification-panel hidden" id="notificationPanel">
+        <div class="notification-header">
+            <h3>Notifications</h3>
+            <button class="modal-close" id="closeNotificationPanel">✕</button>
+        </div>
+        <div class="notification-list" id="notificationList">
+            <!-- Notifications will be populated here -->
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
